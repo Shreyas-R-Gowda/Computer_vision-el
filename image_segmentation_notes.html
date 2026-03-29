@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Thresholding & Region-Based Segmentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #faf9f6;
+    --surface: #ffffff;
+    --ink: #1a1a2e;
+    --ink-soft: #3d3d5c;
+    --ink-muted: #6b6b8a;
+    --accent: #c0392b;
+    --accent-soft: #e8ccc9;
+    --accent2: #2c5f8a;
+    --accent2-soft: #c8dced;
+    --gold: #b8860b;
+    --gold-soft: #f5edd0;
+    --green: #1a6b3a;
+    --green-soft: #d0ead8;
+    --border: #e0ddd6;
+    --code-bg: #1e1e2e;
+    --code-fg: #cdd6f4;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Source Serif 4', Georgia, serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15.5px;
+    line-height: 1.8;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 30px 80px;
+  }
+
+  /* ── COVER ── */
+  .cover {
+    text-align: center;
+    padding: 60px 20px 50px;
+    border-bottom: 3px double var(--border);
+    margin-bottom: 50px;
+    position: relative;
+  }
+  .cover::before {
+    content: '';
+    display: block;
+    width: 60px; height: 4px;
+    background: var(--accent);
+    margin: 0 auto 24px;
+    border-radius: 2px;
+  }
+  .cover .subject-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.6rem;
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 14px;
+  }
+  .cover .subtitle {
+    font-size: 1rem;
+    color: var(--ink-muted);
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+  .cover .meta-pills {
+    display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  }
+  .pill {
+    background: var(--ink);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    padding: 4px 14px;
+    border-radius: 50px;
+  }
+  .pill.accent { background: var(--accent); }
+  .pill.blue { background: var(--accent2); }
+  .pill.gold { background: var(--gold); }
+
+  /* ── PART DIVIDERS ── */
+  .part-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 60px 0 30px;
+    padding: 20px 24px;
+    background: var(--ink);
+    color: #fff;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+  .part-header::after {
+    content: attr(data-emoji);
+    position: absolute; right: 20px;
+    font-size: 2.5rem; opacity: 0.2;
+  }
+  .part-header .part-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    opacity: 0.6;
+  }
+  .part-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+  .part-header .marks {
+    margin-left: auto;
+    background: var(--accent);
+    padding: 3px 12px;
+    border-radius: 50px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  /* ── SECTION HEADINGS ── */
+  h2.section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--ink);
+    margin: 40px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2.section-title .num {
+    background: var(--accent);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 2px 9px;
+    border-radius: 4px;
+  }
+  h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.15rem;
+    color: var(--accent2);
+    margin: 28px 0 10px;
+  }
+  h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 18px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── PROSE ── */
+  p { margin-bottom: 12px; color: var(--ink-soft); }
+
+  /* ── DEFINITION BOX ── */
+  .def-box {
+    border-left: 4px solid var(--accent);
+    background: #fff;
+    padding: 14px 20px;
+    margin: 18px 0;
+    border-radius: 0 6px 6px 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .def-box .def-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .def-box p { color: var(--ink); margin: 0; }
+
+  /* ── KEY CONCEPT BOX ── */
+  .key-box {
+    border: 1.5px solid var(--accent2-soft);
+    background: var(--accent2-soft);
+    padding: 12px 18px;
+    border-radius: 6px;
+    margin: 14px 0;
+    color: var(--ink);
+  }
+  .key-box strong { color: var(--accent2); }
+
+  /* ── FORMULA BOX ── */
+  .formula-box {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 18px 24px;
+    margin: 18px 0;
+    overflow-x: auto;
+    position: relative;
+  }
+  .formula-box .formula-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #89dceb;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .formula-box .formula {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--code-fg);
+    line-height: 2;
+  }
+  .formula-box .formula .highlight { color: #fab387; font-weight: 500; }
+  .formula-box .formula .comment { color: #6c7086; font-style: italic; }
+  .formula-box .var-table {
+    margin-top: 12px;
+    border-top: 1px solid #313244;
+    padding-top: 10px;
+  }
+  .formula-box .var-row {
+    display: flex; gap: 12px; margin-bottom: 4px;
+  }
+  .formula-box .var-name {
+    font-family: 'JetBrains Mono', monospace;
+    color: #cba6f7;
+    font-size: 12px;
+    min-width: 100px;
+  }
+  .formula-box .var-desc {
+    font-size: 12px;
+    color: #a6adc8;
+  }
+
+  /* ── ALGORITHM BOX ── */
+  .algo-box {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 18px 0;
+  }
+  .algo-header {
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .algo-header .algo-icon { font-size: 16px; }
+  .algo-steps { background: var(--surface); padding: 16px 20px; }
+  .algo-steps ol { padding-left: 22px; }
+  .algo-steps li {
+    margin-bottom: 8px;
+    color: var(--ink-soft);
+    padding-left: 4px;
+  }
+  .algo-steps li strong { color: var(--ink); }
+
+  /* ── BULLET LISTS ── */
+  ul.styled {
+    list-style: none;
+    padding-left: 0;
+    margin: 12px 0;
+  }
+  ul.styled li {
+    padding: 5px 0 5px 24px;
+    position: relative;
+    color: var(--ink-soft);
+  }
+  ul.styled li::before {
+    content: '▸';
+    position: absolute; left: 4px;
+    color: var(--accent);
+    font-size: 12px;
+  }
+
+  /* ── COMPARISON TABLE ── */
+  .table-wrap { overflow-x: auto; margin: 20px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead tr {
+    background: var(--ink);
+    color: #fff;
+  }
+  thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    font-weight: 500;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:nth-child(even) { background: #f5f4f0; }
+  tbody td { padding: 10px 16px; color: var(--ink-soft); vertical-align: top; }
+  tbody td:first-child { font-weight: 600; color: var(--ink); }
+  .check { color: var(--green); font-weight: 600; }
+  .cross { color: var(--accent); font-weight: 600; }
+
+  /* ── ADMO BOXES ── */
+  .admo {
+    display: flex; gap: 14px;
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin: 16px 0;
+  }
+  .admo-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .admo-content { flex: 1; }
+  .admo-content strong { display: block; margin-bottom: 4px; }
+  .admo-content p { margin: 0; font-size: 14px; }
+  .admo.tip { background: var(--gold-soft); border-left: 4px solid var(--gold); }
+  .admo.warning { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+  .admo.info { background: var(--accent2-soft); border-left: 4px solid var(--accent2); }
+  .admo.success { background: var(--green-soft); border-left: 4px solid var(--green); }
+
+  /* ── PPT SLIDES ── */
+  .slide-grid { display: grid; gap: 24px; margin: 20px 0; }
+  .slide {
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    background: var(--surface);
+  }
+  .slide-header {
+    background: linear-gradient(135deg, var(--ink) 0%, #2d2d4e 100%);
+    color: #fff;
+    padding: 14px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .slide-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    opacity: 0.5;
+  }
+  .slide-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .slide-body { padding: 18px 22px; }
+  .slide-body ul { list-style: none; padding: 0; margin: 0; }
+  .slide-body li {
+    padding: 6px 0 6px 22px;
+    position: relative;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    border-bottom: 1px dashed var(--border);
+  }
+  .slide-body li:last-child { border-bottom: none; }
+  .slide-body li::before {
+    content: '◆';
+    position: absolute; left: 0;
+    color: var(--accent);
+    font-size: 9px;
+    top: 10px;
+  }
+  .slide-body li strong { color: var(--ink); }
+  .slide-diagram {
+    margin: 12px 0 4px;
+    padding: 10px 14px;
+    background: var(--gold-soft);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .slide-usecase {
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: var(--green-soft);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--green);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── SCRIPT ── */
+  .script-block {
+    border-radius: 8px;
+    margin: 18px 0;
+    overflow: hidden;
+    border: 1.5px solid var(--border);
+  }
+  .script-header {
+    background: var(--accent2);
+    color: #fff;
+    padding: 10px 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .script-slide-ref {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    opacity: 0.7;
+  }
+  .script-speaker {
+    background: #fff;
+    color: var(--accent2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 10px;
+    border-radius: 50px;
+    letter-spacing: 1px;
+    font-weight: 500;
+    margin-left: auto;
+  }
+  .script-content {
+    padding: 16px 22px;
+    font-style: italic;
+    color: var(--ink-soft);
+    background: #fafeff;
+    line-height: 2;
+    font-size: 14.5px;
+    border-left: 3px solid var(--accent2);
+  }
+  .script-content .cue {
+    font-style: normal;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 1px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── SUMMARY CARD ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  @media (max-width: 600px) { .summary-grid { grid-template-columns: 1fr; } }
+  .summary-card {
+    border-radius: 8px;
+    padding: 16px 18px;
+    border: 1.5px solid var(--border);
+  }
+  .summary-card h4 {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: var(--accent);
+  }
+  .summary-card ul { list-style: disc; padding-left: 18px; }
+  .summary-card li { font-size: 13px; color: var(--ink-soft); margin-bottom: 4px; }
+
+  /* ── PROS/CONS ── */
+  .pros-cons {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 14px; margin: 14px 0;
+  }
+  @media (max-width: 500px) { .pros-cons { grid-template-columns: 1fr; } }
+  .pros, .cons {
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .pros {
+    background: var(--green-soft);
+    border: 1.5px solid var(--green);
+  }
+  .cons {
+    background: var(--accent-soft);
+    border: 1.5px solid var(--accent);
+  }
+  .pros h4 { color: var(--green); margin: 0 0 8px; }
+  .cons h4 { color: var(--accent); margin: 0 0 8px; }
+  .pros ul, .cons ul { list-style: none; padding: 0; }
+  .pros li, .cons li { font-size: 13px; color: var(--ink-soft); margin-bottom: 5px; padding-left: 18px; position: relative; }
+  .pros li::before { content: '✓'; position: absolute; left: 0; color: var(--green); }
+  .cons li::before { content: '✗'; position: absolute; left: 0; color: var(--accent); }
+
+  /* ── KEYWORD ── */
+  mark { background: var(--gold-soft); color: var(--gold); padding: 1px 4px; border-radius: 3px; font-weight: 600; }
+  code { font-family: 'JetBrains Mono', monospace; background: #f0eff8; padding: 1px 6px; border-radius: 3px; font-size: 13px; color: var(--accent2); }
+
+  /* ── HR ── */
+  hr { border: none; border-top: 1.5px dashed var(--border); margin: 36px 0; }
+
+  /* ── PRINT ── */
+  @media print {
+    body { padding: 20px; font-size: 13px; }
+    .part-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .slide-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ COVER ═══════════════ -->
+<div class="cover">
+  <div class="subject-tag">Computer Vision · CS365TDA</div>
+  <h1>Image Thresholding &amp;<br>Region-Based Segmentation</h1>
+  <div class="subtitle">Enhanced Academic Notes · PPT Content · Video Script · Concept Clarity</div>
+  <div class="meta-pills">
+    <span class="pill accent">Notes — 6 Marks</span>
+    <span class="pill blue">PPT — 4 Marks</span>
+    <span class="pill gold">Video — 6 Marks</span>
+    <span class="pill">Concept — 4 Marks</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PART 1 — DETAILED NOTES ═══════════════ -->
+<div class="part-header" data-emoji="📘">
+  <div>
+    <div class="part-number">PART 01</div>
+    <h2>Detailed Academic Notes</h2>
+  </div>
+  <span class="marks">6 MARKS</span>
+</div>
+
+<!-- 1. FUNDAMENTALS -->
+<h2 class="section-title"><span class="num">1</span> Fundamentals of Image Segmentation</h2>
+
+<div class="def-box">
+  <div class="def-label">Definition</div>
+  <p><strong>Image Segmentation</strong> is the process of partitioning an image <mark>R</mark> into <em>n</em> non-overlapping, exhaustive subregions (R₁, R₂, …, Rₙ) such that each region is internally homogeneous according to some predefined criterion (e.g., intensity, colour, texture).</p>
+</div>
+
+<h4>Formal Conditions on Subregions</h4>
+<ul class="styled">
+  <li><strong>Completeness:</strong> R₁ ∪ R₂ ∪ … ∪ Rₙ = R (every pixel belongs to some region)</li>
+  <li><strong>Disjointness:</strong> Rᵢ ∩ Rⱼ = ∅ for i ≠ j (no pixel is in two regions)</li>
+  <li><strong>Connectivity:</strong> Each Rᵢ is a connected set</li>
+  <li><strong>Uniformity:</strong> Q(Rᵢ) = TRUE for all i (a predicate is satisfied within the region)</li>
+  <li><strong>Non-mergability:</strong> Q(Rᵢ ∪ Rⱼ) = FALSE for adjacent regions (adjacent regions are distinct)</li>
+</ul>
+
+<h4>Two Fundamental Properties Used</h4>
+<div class="summary-grid">
+  <div class="summary-card">
+    <h4>DISCONTINUITY</h4>
+    <ul>
+      <li>Partition image based on <em>abrupt changes</em> in intensity</li>
+      <li>Basis for <strong>edge-detection</strong> methods</li>
+      <li>Looks for boundaries between regions</li>
+    </ul>
+  </div>
+  <div class="summary-card">
+    <h4>SIMILARITY</h4>
+    <ul>
+      <li>Partition image based on <em>similar properties</em></li>
+      <li>Basis for <strong>thresholding &amp; region-based</strong> methods</li>
+      <li>Groups pixels with common attributes</li>
+    </ul>
+  </div>
+</div>
+
+<div class="admo info">
+  <div class="admo-icon">💡</div>
+  <div class="admo-content">
+    <strong>Intuition:</strong>
+    <p>Think of an image as a puzzle. Discontinuity-based methods find the edges of puzzle pieces. Similarity-based methods group pieces that look the same colour together. Segmentation ultimately answers: <em>which pixels belong together?</em></p>
+  </div>
+</div>
+
+<hr>
+
+<!-- 2. THRESHOLDING -->
+<h2 class="section-title"><span class="num">2</span> Image Thresholding</h2>
+
+<div class="def-box">
+  <div class="def-label">Definition</div>
+  <p>Thresholding converts a greyscale image into a binary image by comparing each pixel's intensity to a threshold value <mark>T</mark>. It is the simplest and computationally cheapest segmentation technique.</p>
+</div>
+
+<div class="formula-box">
+  <div class="formula-label">General Thresholding Formula</div>
+  <div class="formula">
+    g(x, y) = <span class="highlight">1</span>  &nbsp;if f(x, y) &gt; T &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">← object pixel (foreground)</span><br>
+    g(x, y) = <span class="highlight">0</span>  &nbsp;if f(x, y) ≤ T &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">← background pixel</span>
+  </div>
+</div>
+
+<h3>A. Global Thresholding</h3>
+<p>A single constant threshold <mark>T</mark> is applied uniformly across the entire image.</p>
+<ul class="styled">
+  <li>Works well when the image has a <strong>bimodal histogram</strong> (clear object and background peaks)</li>
+  <li>Illumination must be uniform for reliable results</li>
+  <li>Fast and easy to implement</li>
+</ul>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Advantages</h4>
+    <ul>
+      <li>Computationally simple and fast</li>
+      <li>Requires only one parameter (T)</li>
+      <li>Works great on uniformly lit images</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Disadvantages</h4>
+    <ul>
+      <li>Fails under non-uniform illumination</li>
+      <li>Sensitive to noise in the image</li>
+      <li>Poor on multimodal histograms</li>
+    </ul>
+  </div>
+</div>
+
+<h3>B. Variable Thresholding</h3>
+<p>The threshold value <mark>T</mark> varies across the image based on local image properties or spatial coordinates.</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>How T is Determined</th>
+      <th>Best Used When</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Local / Regional</td>
+      <td>Based on neighbourhood mean (m_xy) and standard deviation (σ_xy)</td>
+      <td>Illumination varies across the scene</td>
+    </tr>
+    <tr>
+      <td>Dynamic / Adaptive</td>
+      <td>Based on spatial coordinates (x, y) of the pixel</td>
+      <td>Gradient illumination or shadow effects</td>
+    </tr>
+    <tr>
+      <td>Moving Average</td>
+      <td>Rolling mean along scan lines of the image</td>
+      <td>Fast document scanning applications</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="formula-box">
+  <div class="formula-label">Local Threshold Formula</div>
+  <div class="formula">
+    T<sub>xy</sub> = <span class="highlight">a</span>·σ<sub>xy</sub> + <span class="highlight">b</span>·m<sub>xy</sub>
+  </div>
+  <div class="var-table">
+    <div class="var-row"><span class="var-name">σ_xy</span><span class="var-desc">Local standard deviation in neighbourhood of (x, y)</span></div>
+    <div class="var-row"><span class="var-name">m_xy</span><span class="var-desc">Local mean intensity in neighbourhood of (x, y)</span></div>
+    <div class="var-row"><span class="var-name">a, b</span><span class="var-desc">Tuning constants determined experimentally</span></div>
+  </div>
+</div>
+
+<div class="formula-box">
+  <div class="formula-label">Moving Average Update Formula</div>
+  <div class="formula">
+    m(k+1) = m(k) + <span class="highlight">(1/n)</span> · [z<sub>k+1</sub> − z<sub>k−n+1</sub>]
+  </div>
+  <div class="var-table">
+    <div class="var-row"><span class="var-name">m(k)</span><span class="var-desc">Moving average at position k</span></div>
+    <div class="var-row"><span class="var-name">z_k+1</span><span class="var-desc">Intensity of incoming pixel</span></div>
+    <div class="var-row"><span class="var-name">z_k-n+1</span><span class="var-desc">Intensity of the oldest pixel leaving the window</span></div>
+    <div class="var-row"><span class="var-name">n</span><span class="var-desc">Window size (number of pixels in average)</span></div>
+  </div>
+</div>
+
+<hr>
+
+<!-- 3. OTSU'S METHOD -->
+<h2 class="section-title"><span class="num">3</span> Optimum Global Thresholding — Otsu's Method</h2>
+
+<div class="def-box">
+  <div class="def-label">Definition</div>
+  <p>Otsu's method is a <strong>statistical thresholding algorithm</strong> that automatically determines the optimal threshold <mark>k*</mark> by <em>maximising the between-class variance</em> of the pixel intensity distribution, thereby minimising the average within-class variance (classification error).</p>
+</div>
+
+<div class="admo tip">
+  <div class="admo-icon">🎯</div>
+  <div class="admo-content">
+    <strong>Intuition:</strong>
+    <p>Otsu asks: <em>"At which intensity level should I split the histogram such that the two resulting groups (background and object) are as different as possible from each other?"</em> The answer — the value that maximises σ_B²(k) — is the optimal threshold.</p>
+  </div>
+</div>
+
+<h4>Step-by-Step Algorithm</h4>
+<div class="algo-box">
+  <div class="algo-header"><span class="algo-icon">⚙️</span> OTSU'S THRESHOLDING ALGORITHM</div>
+  <div class="algo-steps">
+    <ol>
+      <li><strong>Compute the normalised histogram</strong> h(i) of the image. Each bin gives p_i = (number of pixels with intensity i) / (total pixels).</li>
+      <li><strong>Compute cumulative sums</strong> P₁(k) = Σ p_i for i = 0 to k. (This is the probability that a pixel belongs to Class 1, intensities 0…k).</li>
+      <li><strong>Compute cumulative means</strong> m(k) = Σ i·p_i for i = 0 to k.</li>
+      <li><strong>Compute the global mean</strong> m_G = Σ i·p_i for i = 0 to L-1 (all levels).</li>
+      <li><strong>Compute between-class variance</strong> σ_B²(k) for every k using the formula below.</li>
+      <li><strong>Find the optimal threshold</strong> k* = argmax{ σ_B²(k) }.</li>
+      <li><strong>Evaluate separability</strong> η = σ_B²(k*) / σ_G² — close to 1 means easy separation, close to 0 means difficult.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="formula-box">
+  <div class="formula-label">Between-Class Variance (Core Formula)</div>
+  <div class="formula">
+    σ_B²(k) = <span class="highlight">[m_G · P₁(k) − m(k)]²</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;────────────────────────<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="highlight">P₁(k) · [1 − P₁(k)]</span>
+  </div>
+  <div class="var-table">
+    <div class="var-row"><span class="var-name">P₁(k)</span><span class="var-desc">Cumulative probability of class 1 (background, 0 to k)</span></div>
+    <div class="var-row"><span class="var-name">1−P₁(k)</span><span class="var-desc">Probability of class 2 (object, k+1 to L-1)</span></div>
+    <div class="var-row"><span class="var-name">m(k)</span><span class="var-desc">Cumulative mean of class 1</span></div>
+    <div class="var-row"><span class="var-name">m_G</span><span class="var-desc">Global mean of the entire image</span></div>
+    <div class="var-row"><span class="var-name">k*</span><span class="var-desc">Optimal threshold = argmax{ σ_B²(k) }</span></div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Advantages</h4>
+    <ul>
+      <li>Fully automatic — no manual tuning</li>
+      <li>Statistically optimal for unimodal separation</li>
+      <li>Uses only the 1D histogram (efficient)</li>
+      <li>Widely supported in OpenCV, MATLAB</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Disadvantages</h4>
+    <ul>
+      <li>Assumes bimodal histogram</li>
+      <li>Fails on multi-class or noisy images</li>
+      <li>Sensitive to non-uniform illumination</li>
+      <li>Ignores spatial information</li>
+    </ul>
+  </div>
+</div>
+
+<div class="admo success">
+  <div class="admo-icon">🌍</div>
+  <div class="admo-content">
+    <strong>Real-World Applications</strong>
+    <p>Medical imaging (separating tissue from background), industrial defect detection (PCB inspection), document digitisation, satellite image analysis (land vs. water).</p>
+  </div>
+</div>
+
+<hr>
+
+<!-- 4. REGION GROWING -->
+<h2 class="section-title"><span class="num">4</span> Region-Based Segmentation</h2>
+
+<h3>A. Region Growing</h3>
+<div class="def-box">
+  <div class="def-label">Definition</div>
+  <p><strong>Region Growing</strong> is a bottom-up segmentation technique that starts from one or more <mark>seed pixels</mark> and iteratively absorbs neighbouring pixels that satisfy a similarity predicate <mark>Q</mark> (e.g., intensity difference within a threshold).</p>
+</div>
+
+<div class="algo-box">
+  <div class="algo-header"><span class="algo-icon">🌱</span> REGION GROWING ALGORITHM</div>
+  <div class="algo-steps">
+    <ol>
+      <li><strong>Seed Selection:</strong> Identify seed points using a priori knowledge (e.g., user input or automatic detection of local extrema).</li>
+      <li><strong>Predicate Image:</strong> For each pixel, check if the similarity predicate Q holds (e.g., |f(x,y) − seed_value| ≤ δ).</li>
+      <li><strong>Region Expansion:</strong> Append all 8-connected neighbours of the seed that satisfy Q to the region.</li>
+      <li><strong>Iterative Growth:</strong> Repeat expansion for newly added pixels until no more qualifying neighbours exist.</li>
+      <li><strong>Labelling:</strong> Assign a unique label to each resulting connected component.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="key-box">
+  <strong>Why Connectivity Matters:</strong> Using only 4-connectivity may fragment regions at diagonal boundaries. 8-connectivity (including diagonal neighbours) gives more natural, contiguous regions.
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Advantages</h4>
+    <ul>
+      <li>Can find non-convex, arbitrarily shaped regions</li>
+      <li>Good at detecting specific objects with a priori knowledge</li>
+      <li>Works well for weld defect, tumour detection</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Disadvantages</h4>
+    <ul>
+      <li>Requires manual or semi-automatic seed selection</li>
+      <li>Sensitive to noise (can grow into wrong areas)</li>
+      <li>Computationally expensive for large images</li>
+    </ul>
+  </div>
+</div>
+
+<h3>B. Region Splitting and Merging</h3>
+<div class="def-box">
+  <div class="def-label">Definition</div>
+  <p><strong>Region Splitting and Merging</strong> is a top-down approach that recursively subdivides the image into quadrants using a <mark>quadtree</mark> structure until all sub-regions satisfy a homogeneity predicate, then merges adjacent similar regions.</p>
+</div>
+
+<div class="algo-box">
+  <div class="algo-header"><span class="algo-icon">🌳</span> SPLIT AND MERGE ALGORITHM</div>
+  <div class="algo-steps">
+    <ol>
+      <li><strong>Initialise:</strong> Treat the entire image as a single region Rᵢ.</li>
+      <li><strong>Split:</strong> If Q(Rᵢ) = FALSE (region is not homogeneous), split Rᵢ into four equal quadrants (children in the quadtree).</li>
+      <li><strong>Repeat:</strong> Apply step 2 recursively to all sub-regions until every leaf node satisfies Q.</li>
+      <li><strong>Merge:</strong> If two adjacent regions Rⱼ and Rₖ satisfy Q(Rⱼ ∪ Rₖ) = TRUE, merge them into one region.</li>
+      <li><strong>Stop:</strong> Terminate when no further merges are possible.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="admo info">
+  <div class="admo-icon">🌳</div>
+  <div class="admo-content">
+    <strong>Quadtree Structure:</strong>
+    <p>The root node = entire image. Each node either has 0 children (leaf, homogeneous) or exactly 4 children (split further). The depth of the tree determines minimum region size (e.g., 1 pixel at leaf level).</p>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Advantages</h4>
+    <ul>
+      <li>Does not need seed points</li>
+      <li>Systematic and structured approach</li>
+      <li>Merging step corrects over-segmentation</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Disadvantages</h4>
+    <ul>
+      <li>Block artefacts from forced quadrant splits</li>
+      <li>Boundaries may not align with true edges</li>
+      <li>Sensitive to the choice of predicate Q</li>
+    </ul>
+  </div>
+</div>
+
+<hr>
+
+<!-- 5. WATERSHED -->
+<h2 class="section-title"><span class="num">5</span> Morphological Watersheds (Overview)</h2>
+<div class="def-box">
+  <div class="def-label">Definition</div>
+  <p>The <strong>Watershed Algorithm</strong> treats image intensity as a topographic surface (height map). It simulates flooding from regional minima and identifies <mark>watershed lines</mark> — ridges where flood waters from different basins would meet — as segmentation boundaries.</p>
+</div>
+<ul class="styled">
+  <li>Applied to the <strong>gradient magnitude image</strong> to detect blob boundaries</li>
+  <li>Produces closed, connected contours — a major advantage over edge detection</li>
+  <li>Common problem: <strong>over-segmentation</strong> due to noise (solved with markers)</li>
+  <li><strong>Real-world use:</strong> Cell/nucleus segmentation in biomedical imaging</li>
+</ul>
+
+<hr>
+
+<!-- 6. COMPARISON TABLE -->
+<h2 class="section-title"><span class="num">6</span> Comparison: All Segmentation Methods</h2>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Method</th>
+      <th>Approach</th>
+      <th>Best For</th>
+      <th>Handles Non-uniform Light</th>
+      <th>Needs Seeds</th>
+      <th>Speed</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Global Thresholding</td>
+      <td>Similarity</td>
+      <td>Bimodal histograms</td>
+      <td><span class="cross">✗ No</span></td>
+      <td><span class="cross">✗ No</span></td>
+      <td>Very Fast</td>
+    </tr>
+    <tr>
+      <td>Otsu's Method</td>
+      <td>Similarity + Stats</td>
+      <td>Automatic binary separation</td>
+      <td><span class="cross">✗ No</span></td>
+      <td><span class="cross">✗ No</span></td>
+      <td>Fast</td>
+    </tr>
+    <tr>
+      <td>Adaptive Thresholding</td>
+      <td>Similarity</td>
+      <td>Varying illumination</td>
+      <td><span class="check">✓ Yes</span></td>
+      <td><span class="cross">✗ No</span></td>
+      <td>Moderate</td>
+    </tr>
+    <tr>
+      <td>Region Growing</td>
+      <td>Similarity</td>
+      <td>Specific object extraction</td>
+      <td><span class="check">✓ Partial</span></td>
+      <td><span class="check">✓ Yes</span></td>
+      <td>Slow</td>
+    </tr>
+    <tr>
+      <td>Split &amp; Merge</td>
+      <td>Similarity + Structure</td>
+      <td>General segmentation</td>
+      <td><span class="check">✓ Partial</span></td>
+      <td><span class="cross">✗ No</span></td>
+      <td>Moderate</td>
+    </tr>
+    <tr>
+      <td>Watershed</td>
+      <td>Discontinuity</td>
+      <td>Connected boundary extraction</td>
+      <td><span class="check">✓ Partial</span></td>
+      <td><span class="cross">✗ No</span></td>
+      <td>Moderate</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<hr>
+
+<!-- 7. QUICK REVISION -->
+<h2 class="section-title"><span class="num">7</span> Quick Revision Summary</h2>
+<div class="summary-grid">
+  <div class="summary-card">
+    <h4>THRESHOLDING RECAP</h4>
+    <ul>
+      <li>Global T → one value for whole image</li>
+      <li>Variable T → local neighbourhood properties</li>
+      <li>Otsu → maximises between-class variance σ_B²</li>
+      <li>Moving avg → fast document scanning</li>
+    </ul>
+  </div>
+  <div class="summary-card">
+    <h4>REGION METHODS RECAP</h4>
+    <ul>
+      <li>Growing → seed → expand via 8-connectivity</li>
+      <li>Split & Merge → quadtree → merge siblings</li>
+      <li>Watershed → flood fill → watershed lines</li>
+      <li>All require predicate Q definition</li>
+    </ul>
+  </div>
+  <div class="summary-card">
+    <h4>KEY FORMULAS</h4>
+    <ul>
+      <li>σ_B²(k) = [m_G·P₁ − m(k)]² / P₁·(1−P₁)</li>
+      <li>T_xy = a·σ_xy + b·m_xy</li>
+      <li>m(k+1) = m(k) + (1/n)[z_k+1 − z_k-n+1]</li>
+    </ul>
+  </div>
+  <div class="summary-card">
+    <h4>REAL-WORLD APPLICATIONS</h4>
+    <ul>
+      <li>Medical: Tumour, cell segmentation</li>
+      <li>Industrial: PCB defect, weld inspection</li>
+      <li>Documents: OCR preprocessing</li>
+      <li>Remote sensing: Land-use mapping</li>
+    </ul>
+  </div>
+</div>
+
+
+<!-- ═══════════════ PART 2 — PPT ═══════════════ -->
+<div class="part-header" data-emoji="📊">
+  <div>
+    <div class="part-number">PART 02</div>
+    <h2>Presentation Slides (PPT Content)</h2>
+  </div>
+  <span class="marks">4 MARKS</span>
+</div>
+
+<div class="slide-grid">
+
+  <!-- SLIDE 1 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 01</span>
+      <span class="slide-title">Image Thresholding &amp; Region-Based Segmentation</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Topic:</strong> Core segmentation techniques in Computer Vision</li>
+        <li><strong>Scope:</strong> Thresholding (Global, Variable, Otsu) and Region-Based methods (Growing, Split-Merge, Watershed)</li>
+        <li><strong>Goal:</strong> Partition images into meaningful regions for analysis</li>
+        <li><strong>Key insight:</strong> Segmentation bridges raw pixels and semantic understanding</li>
+        <li><strong>Course context:</strong> CS365TDA — Unit on Intensity-Based Segmentation</li>
+      </ul>
+      <div class="slide-usecase">🏥 Applications: Medical imaging · Industrial inspection · Document OCR · Satellite mapping</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 02</span>
+      <span class="slide-title">What is Image Segmentation?</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Definition:</strong> Partitioning image R into n subregions R₁…Rₙ — exhaustive, disjoint, and connected</li>
+        <li><strong>Two properties:</strong> Discontinuity (edges) vs. Similarity (thresholding/regions)</li>
+        <li><strong>Output:</strong> Either boundary curves or labelled region maps</li>
+        <li><strong>Predicate Q:</strong> Homogeneity criterion — e.g., same intensity range, texture, colour</li>
+        <li><strong>Challenge:</strong> Noise, illumination variation, and overlapping intensity distributions</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.1 — Original image vs. segmented output showing objects and background labels</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 03</span>
+      <span class="slide-title">Intensity Thresholding — Basics</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Formula:</strong> g(x,y) = 1 if f(x,y) &gt; T; else g(x,y) = 0</li>
+        <li><strong>Global T:</strong> One threshold for the whole image — works on uniform illumination</li>
+        <li><strong>Variable T:</strong> Threshold changes per pixel based on local neighbourhood properties</li>
+        <li><strong>Success factors:</strong> Histogram valley depth, noise level, illumination uniformity, reflectance</li>
+        <li><strong>Multi-threshold:</strong> g(x,y) can be extended to handle multiple objects with different intensities</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.32 — Histogram with single threshold and dual threshold separating background, object1, object2</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 04</span>
+      <span class="slide-title">Otsu's Method — Statistical Optimality</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Goal:</strong> Automatically find T that maximises between-class variance σ_B²(k)</li>
+        <li><strong>Classes:</strong> Class 1 (background, 0…k) with probability P₁; Class 2 (object, k+1…L-1) with probability 1−P₁</li>
+        <li><strong>Formula:</strong> σ_B²(k) = [m_G·P₁(k) − m(k)]² / P₁(k)·[1−P₁(k)]</li>
+        <li><strong>Optimal threshold:</strong> k* = value of k that maximises σ_B²(k)</li>
+        <li><strong>Separability η:</strong> σ_B²(k*) / σ_G² — measures quality of threshold (0 = poor, 1 = perfect)</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.36 — Otsu result on polymersome cell image: original (low contrast) vs. binary output</div>
+      <div class="slide-usecase">🔬 Real-world: Automatic cell counting in microscopy; no manual threshold needed</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 05</span>
+      <span class="slide-title">Otsu's Algorithm — Step by Step</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Step 1:</strong> Normalise histogram → p_i = (pixels with intensity i) / (total pixels)</li>
+        <li><strong>Step 2:</strong> Compute cumulative sum P₁(k) = Σ p_i, for i = 0 to k</li>
+        <li><strong>Step 3:</strong> Compute cumulative mean m(k) = Σ i·p_i, for i = 0 to k; find global mean m_G</li>
+        <li><strong>Step 4:</strong> Compute σ_B²(k) for every intensity level k from 0 to L-1</li>
+        <li><strong>Step 5:</strong> Select k* = argmax{σ_B²(k)}; apply g(x,y) = 1 if f(x,y) &gt; k*, else 0</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Plot of σ_B²(k) vs. k showing a peak at the optimal threshold k*</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 06</span>
+      <span class="slide-title">Improving Thresholding — Preprocessing</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Problem:</strong> Noise broadens histogram modes → valleys disappear → threshold fails</li>
+        <li><strong>Smoothing:</strong> Gaussian or averaging filter before thresholding reduces noise-induced spreading</li>
+        <li><strong>Edge-based histogram:</strong> Use Laplacian or Gradient mask to only consider pixels near edges</li>
+        <li><strong>Result:</strong> Edge-based histograms have sharper, deeper valleys — more reliable peaks</li>
+        <li><strong>Trade-off:</strong> Smoothing loses fine detail; edge-based histograms may miss interior pixels</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.37 — Noisy image histogram (shallow valleys) vs. smoothed histogram (deep valleys, clear peaks)</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 07</span>
+      <span class="slide-title">Variable &amp; Adaptive Thresholding</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Why needed:</strong> Global T fails when illumination is uneven (e.g., shadowed documents, spot lighting)</li>
+        <li><strong>Local threshold:</strong> T_xy = a·σ_xy + b·m_xy — adapts to each neighbourhood's statistics</li>
+        <li><strong>Moving average:</strong> Scans image row by row; m(k+1) = m(k) + (1/n)[z_k+1 − z_k-n+1]</li>
+        <li><strong>Application:</strong> OCR pre-processing — extract clean text regardless of paper shading</li>
+        <li><strong>Note:</strong> Constants a and b are tuned experimentally for each image type</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.44 — Spot-lit document: global threshold (fails, dark areas lost) vs. moving average (clean text)</div>
+      <div class="slide-usecase">🖨️ Real-world: Phone camera document scanner apps (Adobe Scan, CamScanner)</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 8 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 08</span>
+      <span class="slide-title">Region Growing</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Idea:</strong> Start from seed points; iteratively add 8-connected neighbours satisfying predicate Q</li>
+        <li><strong>Seed selection:</strong> Manual (user clicks), semi-automatic (local minima/maxima), or automatic (histogram modes)</li>
+        <li><strong>Predicate Q:</strong> e.g., |intensity of neighbour − seed mean| ≤ δ (delta = tolerance)</li>
+        <li><strong>Stopping criterion:</strong> No further pixels satisfy Q in any current region's neighbourhood</li>
+        <li><strong>Result:</strong> Each connected component of Q-satisfying pixels = one region, uniquely labelled</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.46 — Region growing on X-ray weld image: seed point → predicate binary → final grown region (defect)</div>
+      <div class="slide-usecase">🏭 Real-world: X-ray defect detection in welds; MRI tumour localisation</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 9 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 09</span>
+      <span class="slide-title">Region Splitting &amp; Merging</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Split:</strong> If Q(R) = FALSE for any region → subdivide into four equal quadrants</li>
+        <li><strong>Merge:</strong> If Q(Rⱼ ∪ Rₖ) = TRUE for adjacent regions → combine them</li>
+        <li><strong>Quadtree:</strong> Root = full image; each internal node has exactly four children; leaves are homogeneous blocks</li>
+        <li><strong>Predicate example:</strong> Q = "all pixels in R have intensities within range [μ−σ, μ+σ]"</li>
+        <li><strong>Advantage over growing:</strong> No seed required — completely automatic from whole image</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.47 — Quadtree diagram: partitioned image with block labels (background, dense, sparse) at different depths</div>
+      <div class="slide-usecase">🛰️ Real-world: Satellite image partitioning (forests, urban, water), astronomical image analysis</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 10</span>
+      <span class="slide-title">Quadtree Framework in Depth</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Root:</strong> Represents the entire N×N image; depth-0 node</li>
+        <li><strong>Split condition:</strong> Node is split if intensity range within its block exceeds threshold</li>
+        <li><strong>Minimum block size:</strong> 1×1 pixel — algorithm terminates at individual pixel level if necessary</li>
+        <li><strong>Traversal:</strong> Top-down for splitting, bottom-up for merging adjacent nodes</li>
+        <li><strong>Output:</strong> Labelled map where each unique region label corresponds to a semantically distinct area</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.48 — Cygnus Loop supernova image: original (noisy), quadtree partition, and final labelled regions (background, dense nebula, sparse gas)</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 11 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 11</span>
+      <span class="slide-title">Morphological Watersheds</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Analogy:</strong> Image gradient treated as terrain — valleys are objects, ridges are boundaries</li>
+        <li><strong>Process:</strong> Flood from all regional minima simultaneously; watershed lines form where floods meet</li>
+        <li><strong>Applied to:</strong> Gradient magnitude image (not intensity directly) for robust boundary extraction</li>
+        <li><strong>Key advantage:</strong> Produces closed, connected boundaries — unlike edge detectors</li>
+        <li><strong>Key problem:</strong> Over-segmentation due to noise minima; solved by marker-controlled watershed</li>
+      </ul>
+      <div class="slide-diagram">📊 INSERT: Fig 10.59 — Watershed applied to gradient image: catchment basins + watershed boundary overlay</div>
+      <div class="slide-usecase">🧬 Real-world: Cell/nucleus instance segmentation in pathology slides (H&amp;E staining)</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 12 -->
+  <div class="slide">
+    <div class="slide-header">
+      <span class="slide-num">SLIDE 12</span>
+      <span class="slide-title">Summary &amp; Method Selection Guide</span>
+    </div>
+    <div class="slide-body">
+      <ul>
+        <li><strong>Thresholding:</strong> Best for speed &amp; bimodal images — use Otsu for automatic threshold selection</li>
+        <li><strong>Adaptive Thresholding:</strong> Required for non-uniform lighting (documents, microscopy)</li>
+        <li><strong>Region Growing:</strong> Use when you have prior knowledge of seed locations (tumour, weld defect)</li>
+        <li><strong>Split &amp; Merge:</strong> Systematic, seed-free alternative — good for textured or astronomical images</li>
+        <li><strong>Watershed:</strong> Best for separating touching objects with closed boundaries (cells, grains)</li>
+      </ul>
+      <div class="slide-usecase">🎯 Rule of thumb: Noisy + uniform light → Otsu | Uneven light → Adaptive | Known object → Growing | Complex scene → Watershed</div>
+    </div>
+  </div>
+
+</div><!-- end slide-grid -->
+
+
+<!-- ═══════════════ PART 3 — VIDEO SCRIPT ═══════════════ -->
+<div class="part-header" data-emoji="🎤">
+  <div>
+    <div class="part-number">PART 03</div>
+    <h2>Video Explanation Script</h2>
+  </div>
+  <span class="marks">6 MARKS</span>
+</div>
+
+<div class="admo info">
+  <div class="admo-icon">📋</div>
+  <div class="admo-content">
+    <strong>Script Notes:</strong>
+    <p>The script is divided across 4 team members. Total estimated duration: ~8–10 minutes. Each speaker should maintain a calm, confident academic tone. Cues like <code>[PAUSE]</code> and <code>[POINT TO DIAGRAM]</code> indicate presentation actions.</p>
+  </div>
+</div>
+
+<!-- SPEAKER 1 -->
+<div class="script-block">
+  <div class="script-header">
+    <div>
+      <div class="script-slide-ref">SLIDES 01 – 02</div>
+      <div style="font-family:'Playfair Display',serif; font-size:1rem; margin-top:2px;">Introduction &amp; Segmentation Basics</div>
+    </div>
+    <span class="script-speaker">SPEAKER 1</span>
+  </div>
+  <div class="script-content">
+    Good morning, everyone. Today, our team will walk you through two of the most fundamental categories of image segmentation in Computer Vision — Image Thresholding and Region-Based Segmentation. <span class="cue">[CLICK — Title Slide]</span><br><br>
+    Let's start by understanding what we mean by image segmentation. At its core, segmentation is the process of dividing an image into regions that share common properties. <span class="cue">[CLICK — Slide 2]</span> Mathematically, if our image is R, we want to split it into subregions R₁ through Rₙ such that their union covers the whole image, they don't overlap, and each region is internally similar — satisfying what we call a predicate Q. <span class="cue">[PAUSE]</span><br><br>
+    The two fundamental properties that drive all segmentation algorithms are discontinuity and similarity. Discontinuity-based methods find sharp changes — edges. Similarity-based methods, which are our focus today, group pixels that look alike. Think of it this way: if you're trying to identify a white bone in an X-ray, you group the bright pixels together — that's similarity at work. <span class="cue">[POINT TO DIAGRAM — Fig 10.1]</span>
+  </div>
+</div>
+
+<!-- SPEAKER 2 -->
+<div class="script-block">
+  <div class="script-header">
+    <div>
+      <div class="script-slide-ref">SLIDES 03 – 06</div>
+      <div style="font-family:'Playfair Display',serif; font-size:1rem; margin-top:2px;">Thresholding — Global, Otsu, &amp; Preprocessing</div>
+    </div>
+    <span class="script-speaker">SPEAKER 2</span>
+  </div>
+  <div class="script-content">
+    Thank you. Now let me explain the most widely used similarity-based method — Thresholding. <span class="cue">[CLICK — Slide 3]</span><br><br>
+    The idea is beautifully simple. We pick a value T. Any pixel brighter than T becomes white — the object — and anything below becomes black — the background. With one constant for the whole image, this is called Global Thresholding. It works perfectly when the histogram has two clear peaks — one for the background and one for the object — with a deep valley between them. <span class="cue">[POINT TO DIAGRAM — Fig 10.32]</span><br><br>
+    But how do we pick the best T automatically? That's where Otsu's Method comes in. <span class="cue">[CLICK — Slide 4]</span> Instead of guessing, Otsu treats it as a statistical decision problem. It evaluates every possible threshold value and picks the one that maximises the between-class variance — σ_B squared of k. Intuitively, we want the two groups — background and object — to be as different from each other as possible.<br><br>
+    <span class="cue">[CLICK — Slide 5]</span> The algorithm steps are: first, compute the normalised histogram. Then calculate cumulative sums P₁(k) and cumulative means m(k). Use these to compute σ_B²(k) for each k, and select k-star — the k that gives the highest variance. That k-star is our optimal threshold. No manual tuning required.<br><br>
+    <span class="cue">[CLICK — Slide 6]</span> One important concern — what if the image is noisy? Noise spreads the histogram peaks, making the valley between them disappear, so no threshold works well. The solution is to first smooth the image with a Gaussian filter before thresholding. Alternatively, we can build an edge-enhanced histogram by only considering pixels near edges — those pixels have the most discriminative information. <span class="cue">[POINT TO DIAGRAM — Fig 10.37]</span> As you can see, the smoothed image gives a cleaner histogram with a more reliable threshold.
+  </div>
+</div>
+
+<!-- SPEAKER 3 -->
+<div class="script-block">
+  <div class="script-header">
+    <div>
+      <div class="script-slide-ref">SLIDES 07 – 08</div>
+      <div style="font-family:'Playfair Display',serif; font-size:1rem; margin-top:2px;">Adaptive Thresholding &amp; Region Growing</div>
+    </div>
+    <span class="script-speaker">SPEAKER 3</span>
+  </div>
+  <div class="script-content">
+    Thank you. Now, global thresholding has one major weakness — it assumes uniform lighting. What happens when you photograph a document under a lamp that only illuminates the centre? One threshold value will lose either the bright or the dark parts. <span class="cue">[CLICK — Slide 7]</span><br><br>
+    This is where Variable or Adaptive Thresholding comes in. Instead of one T for the whole image, we compute a local threshold T_xy at every pixel (x,y) based on its neighbourhood statistics: T_xy equals a times the local standard deviation plus b times the local mean. The constants a and b are tuned for the specific image type. The result is a threshold map that follows the lighting changes across the image.<br><br>
+    For applications like document scanning — think CamScanner on your phone — we use a Moving Average approach. As we scan across rows, we maintain a running mean using the formula: m(k+1) equals m(k) plus one-over-n times [z_k+1 minus z_k-minus-n+1]. This efficiently subtracts the oldest pixel from the window and adds the newest, keeping computation fast. <span class="cue">[POINT TO DIAGRAM — Fig 10.44]</span> Notice how global thresholding loses the text in dark regions, but the moving average threshold extracts all the text cleanly.<br><br>
+    <span class="cue">[CLICK — Slide 8]</span> Now we move from thresholding to Region-Based methods — starting with Region Growing. The idea here is to start from a seed point — a pixel we know belongs to our target object — and expand outward by adding any 8-connected neighbour that satisfies our similarity predicate Q. For example, if we're looking for a weld defect, the seed is a pixel in the defect area, and Q might say: include any pixel within 10 intensity units of the current region's mean. <span class="cue">[POINT TO DIAGRAM — Fig 10.46]</span><br><br>
+    We keep expanding until no new pixels qualify. The result is a precisely bounded region corresponding to just the defect — no more, no less. This method is powerful when we have prior knowledge about where the object is, but it requires careful seed selection and a well-defined threshold delta.
+  </div>
+</div>
+
+<!-- SPEAKER 4 -->
+<div class="script-block">
+  <div class="script-header">
+    <div>
+      <div class="script-slide-ref">SLIDES 09 – 12</div>
+      <div style="font-family:'Playfair Display',serif; font-size:1rem; margin-top:2px;">Split-Merge, Watershed &amp; Conclusion</div>
+    </div>
+    <span class="script-speaker">SPEAKER 4</span>
+  </div>
+  <div class="script-content">
+    Thank you. Our final two techniques take a more structural approach. <span class="cue">[CLICK — Slide 9]</span> Region Splitting and Merging works top-down. We start with the whole image as one region. If the predicate Q is false — meaning the region is not homogeneous — we split it into four equal quadrants. We keep splitting recursively until every piece is homogeneous. <span class="cue">[PAUSE]</span><br><br>
+    Then comes the merging step. Any two adjacent regions that together satisfy Q are merged into one. We stop when no more merges are possible. The data structure behind this is called a Quadtree — the root is the full image, every internal node has exactly four children, and the leaves are homogeneous blocks. <span class="cue">[CLICK — Slide 10]</span> <span class="cue">[POINT TO DIAGRAM — Fig 10.47]</span> As you can see, the quadtree naturally separates the dense centre from the sparse background, even for a complex astronomical image like the Cygnus Loop. The beauty here is that no seeds are needed — the algorithm discovers regions entirely on its own.<br><br>
+    <span class="cue">[CLICK — Slide 11]</span> Finally, let's talk briefly about the Watershed Algorithm. Imagine the image gradient as a landscape — high gradient values are mountains, low values are valleys. We flood this landscape from every valley simultaneously. When two floods from different valleys meet, we build a dam — that dam is the watershed boundary. Applied to the gradient magnitude image, this gives us closed, connected boundaries around every distinct object. The main challenge is over-segmentation from tiny noise valleys, which is solved by using markers — pre-defined seeds — to control where flooding starts. <span class="cue">[POINT TO DIAGRAM — Fig 10.59]</span><br><br>
+    <span class="cue">[CLICK — Slide 12]</span> To summarise: Use Otsu for fast, automatic binary segmentation. Use Adaptive thresholding when lighting is uneven. Use Region Growing when you know where your object is. Use Split-and-Merge for structured automatic segmentation. And use Watershed when you need closed boundaries for touching objects like cells. The right technique depends on your image characteristics and the application at hand. Thank you very much!
+  </div>
+</div>
+
+
+<!-- ═══════════════ PART 4 — ENHANCEMENTS ═══════════════ -->
+<div class="part-header" data-emoji="🧠">
+  <div>
+    <div class="part-number">PART 04</div>
+    <h2>Additional Enhancements &amp; Concept Clarity</h2>
+  </div>
+  <span class="marks">4 MARKS</span>
+</div>
+
+<h2 class="section-title"><span class="num">A</span> Global vs. Adaptive Thresholding — Full Comparison</h2>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Global Thresholding</th>
+      <th>Adaptive Thresholding</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Threshold value</td>
+      <td>Single constant T for all pixels</td>
+      <td>Different T_xy for each pixel</td>
+    </tr>
+    <tr>
+      <td>Illumination requirement</td>
+      <td>Requires uniform illumination</td>
+      <td>Handles non-uniform illumination</td>
+    </tr>
+    <tr>
+      <td>Computation speed</td>
+      <td>Very fast (O(n) with histogram)</td>
+      <td>Slower (neighbourhood operation)</td>
+    </tr>
+    <tr>
+      <td>Parameter tuning</td>
+      <td>None (Otsu) or one value</td>
+      <td>Constants a, b, and window size n</td>
+    </tr>
+    <tr>
+      <td>Typical use cases</td>
+      <td>Cell microscopy, X-ray, printed text</td>
+      <td>Document scanning, natural scenes</td>
+    </tr>
+    <tr>
+      <td>Failure modes</td>
+      <td>Shadows, lighting gradients</td>
+      <td>Very large homogeneous regions</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 class="section-title"><span class="num">B</span> Region Growing vs. Split-and-Merge</h2>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Region Growing</th>
+      <th>Split &amp; Merge</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Direction</td>
+      <td>Bottom-up (pixel → region)</td>
+      <td>Top-down then bottom-up (image → blocks → merged regions)</td>
+    </tr>
+    <tr>
+      <td>Seeds required</td>
+      <td><span class="check">Yes — critical step</span></td>
+      <td><span class="cross">No — fully automatic</span></td>
+    </tr>
+    <tr>
+      <td>Shape flexibility</td>
+      <td>Arbitrary shapes possible</td>
+      <td>Block artefacts (rectangular bias)</td>
+    </tr>
+    <tr>
+      <td>Data structure</td>
+      <td>Stack/queue for expansion</td>
+      <td>Quadtree</td>
+    </tr>
+    <tr>
+      <td>Best for</td>
+      <td>Specific known objects (tumours, defects)</td>
+      <td>General scene parsing</td>
+    </tr>
+    <tr>
+      <td>Noise sensitivity</td>
+      <td>High — noise can cause leaking</td>
+      <td>Moderate — splits contain noise, merging corrects</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 class="section-title"><span class="num">C</span> Intuitive Explanations for Complex Concepts</h2>
+
+<div class="admo tip">
+  <div class="admo-icon">💡</div>
+  <div class="admo-content">
+    <strong>Why does Otsu maximise between-class variance?</strong>
+    <p>If two classes (background & object) have very different means, their between-class variance is high. Maximising this is equivalent to minimising the within-class variance (how spread out each class is internally). A clean threshold makes each class tight and well-separated — minimum classification error.</p>
+  </div>
+</div>
+
+<div class="admo tip">
+  <div class="admo-icon">💡</div>
+  <div class="admo-content">
+    <strong>Why use 8-connectivity in Region Growing?</strong>
+    <p>4-connectivity only considers up/down/left/right neighbours. A diagonal line of pixels would be treated as disconnected. 8-connectivity includes diagonals, so regions grow naturally in all directions and don't get artificially fragmented at 45° boundaries.</p>
+  </div>
+</div>
+
+<div class="admo tip">
+  <div class="admo-icon">💡</div>
+  <div class="admo-content">
+    <strong>Moving Average — Why subtract the old pixel?</strong>
+    <p>Instead of re-summing n pixels from scratch for every new position (O(n) per pixel), we maintain a running sum. Adding the new pixel and subtracting the one that just left the window gives us the updated average in O(1) per pixel — dramatically faster for scanning long document rows.</p>
+  </div>
+</div>
+
+<div class="admo warning">
+  <div class="admo-icon">⚠️</div>
+  <div class="admo-content">
+    <strong>Common Exam Mistakes</strong>
+    <p>1) Confusing cumulative mean m(k) with global mean m_G — m(k) is up to level k, m_G is the overall mean. 2) Forgetting that region growing requires 8-connectivity for continuous regions. 3) Stating Otsu works for multimodal histograms — it's designed for bimodal; multi-Otsu is needed for more classes.</p>
+  </div>
+</div>
+
+<h2 class="section-title"><span class="num">D</span> Method Selection Flowchart</h2>
+<div class="algo-box">
+  <div class="algo-header"><span class="algo-icon">🔀</span> WHICH SEGMENTATION METHOD TO CHOOSE?</div>
+  <div class="algo-steps">
+    <ol>
+      <li><strong>Is lighting uniform?</strong> YES → Go to step 2 | NO → Use <strong>Adaptive/Variable Thresholding</strong></li>
+      <li><strong>Is the histogram bimodal (two clear peaks)?</strong> YES → Use <strong>Otsu's Global Thresholding</strong> | NO → Go to step 3</li>
+      <li><strong>Do you know seed locations (prior knowledge)?</strong> YES → Use <strong>Region Growing</strong> | NO → Go to step 4</li>
+      <li><strong>Do you need closed boundaries to separate touching objects?</strong> YES → Use <strong>Watershed</strong> | NO → Use <strong>Split &amp; Merge</strong></li>
+    </ol>
+  </div>
+</div>
+
+<hr>
+
+<div style="text-align:center; padding: 30px 0; color: var(--ink-muted); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px;">
+  COMPUTER VISION · CS365TDA · IMAGE SEGMENTATION NOTES
+  <br><span style="color:var(--accent)">ENHANCED FOR MAXIMUM MARKS</span>
+</div>
+
+</body>
+</html>
